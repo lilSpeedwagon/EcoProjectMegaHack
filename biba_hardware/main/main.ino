@@ -7,11 +7,11 @@
 
 #define TEMPER_PIN 2
 
-const char* ssid     = "WiFI";//?????????????????
-const char* password = "password";//??????????????????
+const char* ssid     = "EBANIY_ROT_ETOGO_KAZINO";
+const char* password = "San987873";
 
 //Web/Server address to read/write from 
-const char *host = "XXX.XXX.X.XX";   // website or IP address of server ??????????????
+const char *host = "192.168.42.36:8086";   // website or IP address of server ??????????????
 
 DHT dht(TEMPER_PIN,DHT22);
 
@@ -46,7 +46,10 @@ void setup() {
 int noise[] = {0,0,0,0,0};
 int resNoise = 0;
 int i = 0;
-int DataArray[] = {0,0,0};
+String DataArray[3] = {};
+String id = "-1";
+String x= "59.995913";
+String y= "30.288869";
 
 void loop() {
 
@@ -55,7 +58,7 @@ void loop() {
 
   HTTPClient http;    //Declare object of class HTTPClient
 
-  String NoiseData, station, getData, Link;
+  String DataString, getData, Link;
 
   if (i < 5){
     noise[i] = analogRead(A0);// for micro
@@ -88,17 +91,23 @@ void loop() {
     Serial.print(" n.p.");
     Serial.println("");*/
   }
-// First of all check one value (resNoise) !!!!!!!!!!!!
-  DataArray[0] = hum; //Humidity sensor
-  DataArray[1] = tem; //Temperature sensor
-  DataArray[2] = resNoise;
-  
-  NoiseData = String(resNoise); //String to interger conversion
-  station = "B";
+
+
+  DataArray[0] = String(resNoise); 
+  DataArray[1] = String(tem); //Temperature sensor
+  DataArray[2] = String(hum); //Humidity sensor
+
+// String DataSend = "{" + "t:" + DataArray[1] + "," + "h:" + DataArray[2] + "," + "id:" + id + "," + "y:" + y + "," + "x:" + x + "}" ;
+String DataSend =   "{\"t\":" + DataArray[1] + "," + "\"h\":" + DataArray[2] + "," + "\"id\":" + id + "," + "\"y\":" + y + "," + "\"x\":" + x+"}" ;
+
+ 
+Serial.println(DataSend);
+
+ DataString = String(DataSend); //String to interger conversion
   
   //GET Data
-  getData = "?status=" + NoiseData + "&station=" + station ;  //Note "?" added at front
-  Link = "http://XXX.XXX.X.XX/ecobomb/getSmallData.php" + getData; //?????????????????????
+  getData = "data/" + DataString ;  //Note "?" added at front
+  Link = "http://192.168.42.36:8086/" + getData; //?????????????????????
 
   http.begin(Link);     //Specify request destination
 
