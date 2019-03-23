@@ -40,12 +40,23 @@ class Biba():
     def gaussian(min_, max_):
         return random.gauss(min_ + (max_-min_)/2,(max_-min_)*0.5)
 
+    def ones(self):
+        r = random.uniform(0,1)
+        if r > 0.95:
+            return 1
+        else:
+            return 0 
+        
+
     def __init__(self, biba_id):
         self.biba_id = biba_id
         self.x = random.uniform(Biba.x_min, Biba.x_max)
         self.y = random.uniform(Biba.y_min, Biba.y_max)
         self.t = round(self.gaussian(Biba.t_min, Biba.t_max), 2)
         self.h = round(self.gaussian(Biba.t_min, Biba.t_max), 2)
+        self.n =  self.ones()
+        self.g1 = self.ones()
+        self.g2 = self.ones()
 
     def randomize(self):
         
@@ -59,13 +70,19 @@ class Biba():
         self.h = round(self.h, 2)
         self.h = self.clip(self.h, Biba.h_min, Biba.h_max)
 
+        self.n = self.ones()
+        self.g1 = self.ones()
+        self.g2 = self.ones()
 
     def get_data(self):
         return {
             'biba_id':self.biba_id,
             'temperature':self.t,
             'y':self.y,
-            'x':self.x
+            'x':self.x,
+            'n':self.n,
+            'g1':self.g1,
+            'g2':self.g2
         }
 
 def current_time():
@@ -108,7 +125,9 @@ async def biba_sim(biba_id,space_id,session,access_data):
                 "humidity":biba.h,
                 "t_list":[{"val":biba.t,"time":current_time()}],
                 "h_list":[{"val":biba.h,"time":current_time()}],
-                "noise":0,
+                "gas_1":biba.g1,
+                "gas_2":biba.g2,
+                "noise":biba.n
             }
         }
 
@@ -166,7 +185,8 @@ async def biba_sim(biba_id,space_id,session,access_data):
                     }
                 }
                 async with session.put('https://xyz.api.here.com/hub/spaces/{space_id}/features/{feature_id}'.format(space_id = space_id, feature_id = id_), json = features_json, params={'access_token':access_data['token']}) as response:
-                    await asyncio.sleep(1)
+                    print('Data of biba {bid} sent. Waiting {sleep_time} seconds...'.format(bid = biba_id, sleep_time = sleep_time))
+                    await asyncio.sleep(sleep_time)
 
 async def simulate(biba_nums, space_id, access_data):
     async with aiohttp.ClientSession() as session:
