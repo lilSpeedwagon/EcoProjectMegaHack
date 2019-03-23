@@ -39,6 +39,20 @@
             <div class="navbar-brand col-4">
                 <a class="brand text-light" href="index.html">EcoProject</a>
             </div>
+            <div class="col-4 btn-group btn-group-toggle" data-toggle="buttons">
+                <label class="btn btn-secondary active">
+                    <input type="radio" name="options" id="option_none" autocomplete="off" checked> None
+                </label>
+                <label class="btn btn-secondary">
+                    <input type="radio" name="options" id="option_co2" autocomplete="off"> CO2
+                </label>
+                <label class="btn btn-secondary">
+                    <input type="radio" name="options" id="option_pol" autocomplete="off"> Pollution
+                </label>
+                <label class="btn btn-secondary">
+                    <input type="radio" name="options" id="option_noise" autocomplete="off"> Noise
+                </label>
+            </div>
         </nav>
 
         <div id='container' class='container-fluid bg-dark text-light'>
@@ -97,6 +111,28 @@
              
             var tempArr = arrClear(tempArr);            
             var humArr = arrClear(humArr);
+            
+            var selectedMap = 0;
+            var op_co2 = document.getElementById('option_co2');
+            op_co2.onchange = function() {
+                selectedMap = 1;
+                updateFeatures();
+            }
+            var op_pol = document.getElementById('option_pol');
+            op_pol.onchange = function() {
+                selectedMap = 2;
+                updateFeatures();
+            }
+            var op_noise = document.getElementById('option_noise');            
+            op_noise.onchange = function()   {
+                selectedMap = 3;
+                updateFeatures();
+            }
+            var op_none = document.getElementById('option_none');            
+            op_none.onchange = function()   {
+                selectedMap = 0;
+                updateFeatures();
+            }
                
             /*
             var APP_ID = 'li5VO7vpWnNOa3zo51vT';
@@ -113,19 +149,6 @@
             var spaceName = 'hack_university_space';
             var deviceSpaceId = "20a1BqJx";
             var deviceToken = "ALBEdMNS0iaTTOhfzju1sQk";
-
-            const platform = new H.service.Platform({
-                APP_ID,
-                APP_CODE,
-                useCIT: true,
-                useHTTPS: true
-            });
-            var query = {
-                "fileName":"./query.json",
-                "dataset":"561122bec90a46778e08c366ce201402",
-                "id":"0178cae13063446dad958ff31badda63"
-            };
-            var service = platform.configure(new H.datalens.Service());
             
             var baseStyle = [{zIndex:3, type:"Circle", radius:16, fill:"#00F7FF", opacity: 0.8}];
             var sProvider = new here.xyz.maps.providers.SpaceProvider ({
@@ -140,12 +163,14 @@
                 min: 1,
                 max: 20,
                 provider: sProvider,
+                margin: 500,
                 style:{
                     styleGroups: {
                         linkStyle: baseStyle                        
                     },
 
                     assign: function(feature, zoomlevel){
+                        updateFeatures();
                         return "linkStyle";
                     }
                 }
@@ -163,15 +188,15 @@
                 min: 1,
                 max: 20,
                 provider: deviceProvider,
-                style:{
+                style: {
                     styleGroups: {
-                        linkStyle: [{zIndex:0, type:"Circle", radius:16, fill:"#C300FF", opacity: 0.8}]
+                        linkStyle: [{zIndex:3, type:"Circle", radius:16, fill:"#AA87FF", opacity: 0.8}]                        
                     },
 
                     assign: function(feature, zoomlevel){
                         return "linkStyle";
                     }
-                }
+                }             
             });
                         
             var layers = [
@@ -192,7 +217,7 @@
                     app_id: APP_ID,
                     app_code: APP_CODE
                 },
-                zoomlevel: 14,
+                zoomlevel: 12,
                 center: {
                     longitude: 30.30611,
                     latitude: 59.93314
@@ -200,22 +225,25 @@
                 layers: layers
              });
             var clickedFeature = deviceProvider.all()[0];
+            
             var selectedStyle = [{
-                zIndex: 3,
+                zIndex: 4,
                 type: "Circle",
                 radius: 20,
                 opacity: 0.9,
                 fill: "#00F7FF"
             }];
-            
+
             function setFeature(feature, style){
                 if(feature)
                     pointsLayer.setStyleGroup(feature, style);
             }
 
             display.addEventListener('pointerup', function(ev){
-                if(clickedFeature)
+                if(clickedFeature)  {
                     pointsLayer.setStyleGroup(clickedFeature);
+                    updateFeatures();
+                }
                 if(ev.target){
                     clickedFeature = ev.target;
                     setFeature(clickedFeature, selectedStyle);                               
@@ -233,27 +261,8 @@
                     var noize = clickedFeature.properties.noise;
                     noize_value.innerHTML = noize;
                     
-                    tempArr = arrClear(tempArr);
-                    humArr = arrClear(humArr);
-                    clickedFeature.properties.t_list.forEach(function(point)    {
-                        let time = new Date(point.time.y, point.time.mo, point.time.d, point.time.h, point.time.mi, point.time.s, 0);
-                        tempArr.push([time, point.val]);
-                    });
-                    clickedFeature.properties.h_list.forEach(function(point)    {
-                        let time = new Date(point.time.y, point.time.mo, point.time.d, point.time.h, point.time.mi, point.time.s, 0);
-                        humArr.push([time, point.val]);
-                    });
-                    drawChart();
+                    chartFor(clickedFeature);
                 }
-            });      
-            display.addEventListener('pointerenter', function(evt){
-                setFeature(evt.target, selectedStyle);
-            });
-
-            // add event listener to pointerleave
-            display.addEventListener('pointerleave', function(evt){
-                if (clickedFeature != evt.target)
-                    setFeature(evt.target, baseStyle);
             });
             
             display.addLayer(pointsLayer);
@@ -261,15 +270,37 @@
             
             function updateFeatures()   {
                 var features = sProvider.all();
-                features.forEach(function(feature) {
-                    var temp = feature.properties.t_list(0).val;
-                    var style = {
-                        zIndex:0, type:"Circle", radius:16, fill:"#" + (temp/20*255) + "0000", opacity: 0.8
-                    };
-                    pointsLayer.setStyleGroup(feature, style); 
+                features.forEach(function(f) {
+                    switch(selectedMap) {
+                        case 0: {
+                            pointsLayer.setStyleGroup(f, baseStyle);
+                            break;
+                        }
+                        case 1: {
+                            let co2 = f.properties.gas_1;
+                            let red = co2 / 100 * 255;
+                            let green = 255 - red;
+                            pointsLayer.setStyleGroup(f, [{zIndex:3, type:"Circle", radius:100, fill:"#"+red+green+"FF", opacity: 0.5}]);
+                            break;
+                        }
+                        case 2: {
+                            let pol = f.properties.gas_2;
+                            let red = pol / 1000 * 255;
+                            let green = 255 - red;
+                            pointsLayer.setStyleGroup(f, [{zIndex:3, type:"Circle", radius:100, fill:"#"+red+green+"FF", opacity: 0.5}]);
+                            break;
+                        }
+                        case 3: {
+                            let noise = f.properties.noise;
+                            let red = noise  / 1000 * 255;
+                            let green = 255 - red;
+                            pointsLayer.setStyleGroup(f, [{zIndex:3, type:"Circle", radius:100, fill:"#"+red+green+"FF", opacity: 0.5}]);
+                            break;
+                        }
+                    }
                 });
             }
-            //updateFeatures();
+            updateFeatures();
             
             var minX = 59.85115;
             var minY = 30.16413;
@@ -282,6 +313,20 @@
             for (var i = 0; i < 50; i++)    {
                 arr.push([i, Math.sin(i)]);   
             }*/
+            
+            function chartFor(featue)   {
+                tempArr = arrClear(tempArr);
+                humArr = arrClear(humArr);
+                featue.properties.t_list.forEach(function(point)    {
+                    let time = new Date(point.time.y, point.time.mo, point.time.d, point.time.h, point.time.mi, point.time.s, 0);
+                    tempArr.push([time, point.val]);
+                });
+                featue.properties.h_list.forEach(function(point)    {
+                    let time = new Date(point.time.y, point.time.mo, point.time.d, point.time.h, point.time.mi, point.time.s, 0);
+                    humArr.push([time, point.val]);
+                });
+                drawChart();
+            }
             
             var tempOptions = {
                 hAxis: {title: 'Время, сек', 
