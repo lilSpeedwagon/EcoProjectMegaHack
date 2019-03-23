@@ -1,7 +1,7 @@
 int sensorValue = 0; // переменная для хранения значения датчика
 void setup()
 {
-Serial.begin(9600);
+Serial.begin(115200);
 }
 void loop()
 {
