@@ -1,0 +1,21 @@
+body    {
+    height: 100vh
+}
+
+
+#map    {
+    min-height: 90vh;
+    min-width: 63vw;
+    height: 90vh;
+    width: 63vw;
+}
+
+footer  {
+    position: absolute;
+    bottom: 0;
+}
+
+#navbar-custom  {
+    margin: 0;
+    border-bottom: aqua 3px solid
+}
