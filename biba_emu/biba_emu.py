@@ -1,12 +1,13 @@
 import json
-from multiprocessing import Pool
+from multiprocessing import Process
 import random
 import time
 import requests
 from pprint import pprint 
 from datetime import datetime
-
-
+import aiohttp
+import asyncio
+    
 class Biba():
     
     #magic numbers are corner coordinates of Saint-Petersburg
@@ -48,13 +49,13 @@ class Biba():
 
     def randomize(self):
         
-        self.t = self.t + random.uniform((-(Biba.t_min - Biba.t_max)/2)*0.05,
-                                        ((Biba.t_min - Biba.t_max)/2)*0.05)
+        self.t = self.t + random.uniform((-(Biba.t_min - Biba.t_max)/2)*0.1,
+                                        ((Biba.t_min - Biba.t_max)/2)*0.1)
         self.t = round(self.t, 2)
         self.t = self.clip(self.t, Biba.t_min, Biba.t_max)
         
-        self.h = self.h + random.uniform((-(Biba.h_min - Biba.h_max)/2)*0.05,
-                                        ((Biba.h_min - Biba.h_max)/2)*0.05)
+        self.h = self.h + random.uniform((-(Biba.h_min - Biba.h_max)/2)*0.1,
+                                        ((Biba.h_min - Biba.h_max)/2)*0.1)
         self.h = round(self.h, 2)
         self.h = self.clip(self.h, Biba.h_min, Biba.h_max)
 
@@ -67,71 +68,16 @@ class Biba():
             'x':self.x
         }
 
-def biba_sim(biba_id):
+async def biba_sim(biba_id,space_id,session,access_data):
     
-    access_data = {
-        "token":"ALBEdMNS0iaTTOhfzju1sQk"
-    }
-
-    work_time = 20
+    work_time = 10000000
     sleep_time = 1
 
     start_time = time.time()
     biba = Biba(biba_id)
-    response = requests.get('https://xyz.api.here.com/hub/spaces/{space_id}/iterate'.format(space_id = '4WAJKc2S'), params={'access_token':access_data['token']})
-    feature_table = json.loads(response.content)
+    async with session.get('https://xyz.api.here.com/hub/spaces/{space_id}/iterate'.format(space_id = space_id), params={'access_token':access_data['token']}) as response:
+        feature_table = json.loads(await response.text())
 
-    features_json = {
-        "type": "Feature",
-        "geometry":
-        {
-            "type": "Point",
-            "coordinates":
-            [
-                biba.x,
-                biba.y
-            ]
-        },
-        "properties":
-        {
-            "biba_id":biba_id,
-            "temperature":biba.t,
-            "humidity":biba.h,
-            "t_list":[{"val":biba.t,"time":datetime.today().strftime("%Y-%m-%d-%H.%M.%S")}],
-            "h_list":[{"val":biba.h,"time":datetime.today().strftime("%Y-%m-%d-%H.%M.%S")}],
-            "noise":0,
-        }
-    }
-    flag = True
-    for feature in feature_table['features']:
-        if biba_id == feature['properties']['biba_id']:
-            id_ = feature['id']
-            flag = False
-            break
-    if flag:
-        response = requests.put('https://xyz.api.here.com/hub/spaces/{space_id}/features'.format(space_id = '4WAJKc2S'), json = features_json, params={'access_token':access_data['token']})
-        id_ = json.loads(response.content)['features'][0]['id']
-
-    while(time.time() - start_time<=work_time):
-        
-        biba.randomize()
-        
-        response = requests.get('https://xyz.api.here.com/hub/spaces/{space_id}/features/{feature_id}'.format(space_id = '4WAJKc2S', feature_id = id_), params={'access_token':access_data['token']})
-        content = json.loads(response.content)
-        pprint(content)
-        try:
-            h_list = content['properties']['h_list']
-            h_list.append({"val":biba.h, "time":datetime.today().strftime("%Y-%m-%d-%H.%M.%S")})
-            if len(h_list) > 100:
-                h_list.pop(0)
-            t_list = content['properties']['t_list']
-            t_list.append({"val":biba.t, "time":datetime.today().strftime("%Y-%m-%d-%H.%M.%S")})
-            if len(t_list) > 100:
-                t_list.pop(0)
-        except Exception as e:
-            print(e)
-            h_list = [{"val":biba.h,"time":datetime.today().strftime("%Y-%m-%d-%H.%M.%S")}]
-            t_list = [{"val":biba.t,"time":datetime.today().strftime("%Y-%m-%d-%H.%M.%S")}]    
         features_json = {
             "type": "Feature",
             "geometry":
@@ -147,14 +93,77 @@ def biba_sim(biba_id):
             {
                 "biba_id":biba_id,
                 "temperature":biba.t,
-                "t_list":t_list,
-                "h_list":h_list,
                 "humidity":biba.h,
+                "t_list":[{"val":biba.t,"time":datetime.today().strftime("%Y-%m-%d-%H.%M.%S")}],
+                "h_list":[{"val":biba.h,"time":datetime.today().strftime("%Y-%m-%d-%H.%M.%S")}],
                 "noise":0,
             }
         }
-        response = requests.put('https://xyz.api.here.com/hub/spaces/{space_id}/features/{feature_id}'.format(space_id = '4WAJKc2S', feature_id = id_), json = features_json, params={'access_token':access_data['token']})
-        time.sleep(sleep_time)
+
+        flag = True
+        if 'features' in feature_table: 
+            for feature in feature_table['features']:
+                if biba_id == feature['properties']['biba_id']:
+                    id_ = feature['id']
+                    flag = False
+                    break
+        if flag:
+            async with session.put('https://xyz.api.here.com/hub/spaces/{space_id}/features'.format(space_id = space_id), json = features_json, params={'access_token':access_data['token']}) as response:
+                id_ = json.loads(await response.text())['features'][0]['id']
+
+        while(time.time() - start_time<=work_time):
+            
+            #print('Hello from biba{biba}'.format(biba = biba_id))
+
+            biba.randomize()
+            
+            async with session.get('https://xyz.api.here.com/hub/spaces/{space_id}/features/{feature_id}'.format(space_id = space_id, feature_id = id_), params={'access_token':access_data['token']}) as response:
+                content = json.loads(await response.text())
+                try:
+                    h_list = content['properties']['h_list']
+                    h_list.append({"val":biba.h, "time":datetime.today().strftime("%Y-%m-%d-%H.%M.%S")})
+                    if len(h_list) > 100:
+                        h_list.pop(0)
+                    t_list = content['properties']['t_list']
+                    t_list.append({"val":biba.t, "time":datetime.today().strftime("%Y-%m-%d-%H.%M.%S")})
+                    if len(t_list) > 100:
+                        t_list.pop(0)
+                except Exception as e:
+                    print(e)
+                    h_list = [{"val":biba.h,"time":datetime.today().strftime("%Y-%m-%d-%H.%M.%S")}]
+                    t_list = [{"val":biba.t,"time":datetime.today().strftime("%Y-%m-%d-%H.%M.%S")}]    
+                features_json = {
+                    "type": "Feature",
+                    "geometry":
+                    {
+                        "type": "Point",
+                        "coordinates":
+                        [
+                            biba.x,
+                            biba.y
+                        ]
+                    },
+                    "properties":
+                    {
+                        "biba_id":biba_id,
+                        "temperature":biba.t,
+                        "t_list":t_list,
+                        "h_list":h_list,
+                        "humidity":biba.h,
+                        "noise":0,
+                    }
+                }
+                async with session.put('https://xyz.api.here.com/hub/spaces/{space_id}/features/{feature_id}'.format(space_id = space_id, feature_id = id_), json = features_json, params={'access_token':access_data['token']}) as response:
+                    await response.text()
+                    await asyncio.sleep(1)
+
+
+async def simulate(biba_nums, space_id, access_data):
+    async with aiohttp.ClientSession() as session:
+        task_list = []
+        for i in biba_nums:
+            task_list.append(asyncio.create_task(biba_sim(i,space_id,session,access_data)))
+        return await asyncio.gather(*task_list)
 
 if __name__ == '__main__':
     
@@ -162,21 +171,20 @@ if __name__ == '__main__':
         access_data = json.load(fp = f)
 
     new_space ={
-        'title':'demo',
-        'description':'hello'
+        'title':'hack_university_space',
+        'description':'An array of map points made by simulation program'
     }
 
-    #response = requests.post('https://xyz.api.here.com/hub/spaces', params={'access_token':access_data['token']}, json = new_space)
-    #print(response.content)
+    try:
+        space_id = access_data['space_id']
+    except:    
+        response = requests.post('https://xyz.api.here.com/hub/spaces', params={'access_token':access_data['token']}, json = new_space)
+        space_id = json.loads(response.content)['id']
+        with open('access_data.json','w') as f:
+            new_json = {
+                'token':access_data['token'],
+                'space_id':space_id
+            }
+            json.dump(new_json, f, indent=2)
 
-
-    #response = requests.get('https://xyz.api.here.com/hub/spaces/{space_id}/iterate'.format(space_id = '4WAJKc2S'), params={'access_token':access_data['token']})
-    #pprint(json.loads(response.content))
-
-
-    #response = requests.get('https://xyz.api.here.com/hub/spaces/{space_id}/features/aXe8SZzr44'.format(space_id = '4WAJKc2S'), params={'access_token':access_data['token']})
-    #print(response.content)
-    bibas_num = 80
-    pool = Pool(bibas_num)
-    pool.map(biba_sim, range(bibas_num))
-    biba_sim(0)
+    asyncio.run(simulate(biba_nums = list(range(200)), space_id = space_id, access_data = access_data))
