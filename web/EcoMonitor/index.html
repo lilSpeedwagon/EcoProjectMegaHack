@@ -19,14 +19,20 @@
         <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM" crossorigin="anonymous"></script>
         
         <!-- here API -->
-        <meta name="viewport" content="initial-scale=1.0, 
-        width=device-width" />
-        <script src="http://js.api.here.com/v3/3.0/mapsjs-core.js" 
-        type="text/javascript" charset="utf-8"></script>
-        <script src="http://js.api.here.com/v3/3.0/mapsjs-service.js" 
-        type="text/javascript" charset="utf-8"></script>
-        <script src="https://js.cit.api.here.com/v3/3.0/mapsjs-mapevents.js"
-        type="text/javascript" ></script>
+        <script src="https://js.api.here.com/v3/3.0/mapsjs-core.js" type="text/javascript" charset="utf-8"></script>
+        <script src="https://js.api.here.com/v3/3.0/mapsjs-service.js" type="text/javascript" charset="utf-8"></script>
+        <script src="https://js.api.here.com/v3/3.0/mapsjs-mapevents.js" type="text/javascript" ></script>
+        <script src="https://js.api.here.com/v3/3.0/mapsjs-data.js" type="text/javascript" ></script>
+
+        <script type="text/javascript" src="https://js.cit.datalens.api.here.com/latest/mapsjs-datalens.js"></script>
+        <!--
+        <script type="text/javascript" src="https://js.cit.api.here.com/v3/3.0/mapsjs-clustering.js"></script>
+        <script type="text/javascript" src="https://js.cit.api.here.com/v3/3.0/mapsjs-ui.js"></script> -->
+        
+        <!-- xyz API -->
+        <script src="https://xyz.api.here.com/maps/latest/xyz-maps-common.min.js" type="text/javascript" charset="UTF-8" ></script>
+        <script src="https://xyz.api.here.com/maps/latest/xyz-maps-core.min.js" type="text/javascript" charset="UTF-8" ></script>
+        <script src="https://xyz.api.here.com/maps/latest/xyz-maps-display.min.js" type="text/javascript" charset="UTF-8" ></script>      
                 
 
         <nav class="navbar navbar-dark bg-secondary navbar-expand-lg justify-content-between" id="navbar-custom">
@@ -43,13 +49,14 @@
                         <ul class='list-unstyled'>
                             <li>ID устройства: <span id='id_value'></span></li>
                             <li>Координаты: <span id='xy_value'></span></li>
-                            <li>Расположение: <span id='location_value'></span></li>
-                            <li>Температура: <span id='temp_value'></span></li>
-                            <li>Загрязненность воздуха: <span id='pollution_value'></span></li>
+                            <li>Температура: <span id='temp_value'></span>, °C</li>
+                            <li>CO2: <span id='co2_value'></span>, %</li>
+                            <li>Загрязненность воздуха: <span id='pollution_value'></span>, ppm</li>
+                            <li>Шум: <span id='noize_value'></span>, dB</li>
                         </ul>
                     </div>
                     <div class='m-2' id='temp_chart'></div>   
-                    <div class='m-2' id='pol_chart'></div> 
+                    <div class='m-2' id='hum_chart'></div> 
                 </div>
                 <div class='col-8'>
                     <div id="map"></div>
@@ -65,6 +72,7 @@
             </ul>
         </footer>
         
+        <script src="https://www.google.com/jsapi"></script>
         <script>
             var currentDevice = undefined;
             var data = [{
@@ -76,122 +84,230 @@
             }];
             var id_value = document.getElementById('id_value');
             var xy_value = document.getElementById('xy_value');
-            var location_value = document.getElementById('location_value');
             var temp_value = document.getElementById('temp_value');
             var pollution_value = document.getElementById('pollution_value');
+            var co2_value = document.getElementById('co2_value');
+            var noize_value = document.getElementById('noize_value');
             
-            
-            //карта
-            function addMarker(x, y, id)    {
-                var pos = { 
-                    lat: x,
-                    lng: y
-                };
-                var marker = new H.map.Marker(pos);
-                marker.setData({
-                    'id' : id
-                });
-                M.Map.addObject(marker);                
+            function arrClear(arr)  {
+                arr = new Array;
+                arr.push(['t','v']);
+                return arr;
             }
+             
+            var tempArr = arrClear(tempArr);            
+            var humArr = arrClear(humArr);
+               
+            /*
+            var APP_ID = 'li5VO7vpWnNOa3zo51vT';
+            var APP_CODE = 'TiLWurluCwGBtp_QDTU1bQ';
+            var accessToken = 'ANBnHonaF9KWV5GEeSS0SAI';
+            var spaceID = 'TB6ZGyRB';
+            var spaceName = 'test_space';
+           */
             
-            var M = {
-               'Init' : {    // developer.here.com for app_id and app_code
-                 'app_id':   'li5VO7vpWnNOa3zo51vT',
-                 'app_code': 'TiLWurluCwGBtp_QDTU1bQ',
-                 useHTTPS: true,
-                 'style': 'alps'
-               },
-               'Behavior' : {},       // Управление событиями карты
-               'Container' :   {},       // Контейнер для отображения карты
-               'PlacesService':{},       // Сервис Places API
-               'PlacesGroup':  {},       // Группа для хранения точек интереса
-               'Lat' :         55.751,   // Широта (центр карты)
-               'Lng' :         37.620,   // Долгота (центр карты)
-               'Layers' :      {},       // Список картографических основ
-               'Map' :         {},       // Объект карты
-               'Platform' :    {},       // Платформа HERE API
-               'UI' :          {},       // Пользовательский интерфейс
-               'Zoom' :        12        // 1 == весь мир, 15 == масштаб улицы
+            var APP_ID = 'oXOS0ZLlNpZNjBzpD4Sb';
+            var APP_CODE = 'PI3Ni7iUDimLFysOu632lQ';
+            var accessToken = 'ALBEdMNS0iaTTOhfzju1sQk';
+            var spaceID = 'touRsD6B';
+            var spaceName = 'hack_university_space';
+            var deviceSpaceId = "20a1BqJx";
+            var deviceToken = "ALBEdMNS0iaTTOhfzju1sQk";
+
+            const platform = new H.service.Platform({
+                APP_ID,
+                APP_CODE,
+                useCIT: true,
+                useHTTPS: true
+            });
+            var query = {
+                "fileName":"./query.json",
+                "dataset":"561122bec90a46778e08c366ce201402",
+                "id":"0178cae13063446dad958ff31badda63"
             };
-            M.Container = document.querySelector('#map');
-            // инициализация платформы
-            M.Platform = new H.service.Platform(M.Init);     
-            // Получение списка базовых карт
-            M.Layers = M.Platform.createDefaultLayers({lg:"rus"});
-            //инициализация карты
-            var initPos = {
-              zoom: 10,
-              center: { lng: 30.30611, lat: 59.93314 }
-            };    
-            M.Map = new H.Map(M.Container, M.Layers.normal.map, initPos);
-            // интерактивное поведение
-            var mapEvents = new H.mapevents.MapEvents(M.Map);
-            M.Behavior =  new H.mapevents.Behavior(mapEvents);
-                    
-            addMarker(59.93314, 30.30611, 1);
+            var service = platform.configure(new H.datalens.Service());
             
-            M.Map.addEventListener('tap', function (evt) {
-                if (evt.target instanceof H.map.Marker) {
-                    var currentMarkerId = evt.target.getData().id;
-                    setDevice(currentMarkerId);
+            var baseStyle = [{zIndex:3, type:"Circle", radius:16, fill:"#00F7FF", opacity: 0.8}];
+            var sProvider = new here.xyz.maps.providers.SpaceProvider ({
+                name:  'SpaceProvider',
+                space: spaceID,
+                credentials: {
+                    access_token: accessToken,
                 }
             });
-            
-            function setDevice(markerId)  {
-                console.log('set device '+markerId);
-                currentDevice = markerId;
-                id_value.innerHTML = markerId;
-                xy_value.innerHTML = data[markerId].x + ' ' + data[markerId].y;
-                location_value.innerHTML = data[markerId].location;
-                temp_value.innerHTML = data[markerId].temp;
-                pollution_value.innerHTML = data[markerId].pollution;
-            }
-            
-            
-            
-            //запросы
-            function request()  {
-                /*
-                var request = new XMLHttpRequest();
-                request.open('GET', 'http://', false);
-                request.send();
+            var pointsLayer = new here.xyz.maps.layers.TileLayer({   
+                name: 'Space Layer',
+                min: 1,
+                max: 20,
+                provider: sProvider,
+                style:{
+                    styleGroups: {
+                        linkStyle: baseStyle                        
+                    },
 
-                // Если код ответа сервера не 200, то это ошибка
-                if (request.status != 200) {
-                    alert( request.status + ': ' + request.statusText );
-                } else {
-                    var answer = request.responseText;
+                    assign: function(feature, zoomlevel){
+                        return "linkStyle";
+                    }
                 }
-                */
-                console.log("timed func invoked");
+            });            
+            
+            var deviceProvider = new here.xyz.maps.providers.SpaceProvider ({
+                name:  'DeviseProvider',
+                space: deviceSpaceId,
+                credentials: {
+                    access_token: deviceToken,
+                }
+            });
+            var deviceLayer = new here.xyz.maps.layers.TileLayer({   
+                name: 'Device Layer',
+                min: 1,
+                max: 20,
+                provider: deviceProvider,
+                style:{
+                    styleGroups: {
+                        linkStyle: [{zIndex:0, type:"Circle", radius:16, fill:"#C300FF", opacity: 0.8}]
+                    },
+
+                    assign: function(feature, zoomlevel){
+                        return "linkStyle";
+                    }
+                }
+            });
+                        
+            var layers = [
+                new here.xyz.maps.layers.TileLayer({
+                    name: 'Image Layer',
+                    min: 1,
+                    max: 20,
+                    provider: new here.xyz.maps.providers.ImageProvider({
+                        name: 'Live Map',
+                        url : 'https://{SUBDOMAIN_INT_1_4}.mapcreator.tilehub.api.here.com/tilehub/wv_livemap_bc/png/sat/256/{QUADKEY}?access_token='+accessToken
+                    })
+                })
+            ];
+            
+            // Initialize the display and define startup location
+            var display = new here.xyz.maps.Map( document.querySelector('#map'), { 
+                credentials: {
+                    app_id: APP_ID,
+                    app_code: APP_CODE
+                },
+                zoomlevel: 14,
+                center: {
+                    longitude: 30.30611,
+                    latitude: 59.93314
+                },
+                layers: layers
+             });
+            var clickedFeature = deviceProvider.all()[0];
+            var selectedStyle = [{
+                zIndex: 3,
+                type: "Circle",
+                radius: 20,
+                opacity: 0.9,
+                fill: "#00F7FF"
+            }];
+            
+            function setFeature(feature, style){
+                if(feature)
+                    pointsLayer.setStyleGroup(feature, style);
             }
+
+            display.addEventListener('pointerup', function(ev){
+                if(clickedFeature)
+                    pointsLayer.setStyleGroup(clickedFeature);
+                if(ev.target){
+                    clickedFeature = ev.target;
+                    setFeature(clickedFeature, selectedStyle);                               
+                    
+                    var id = clickedFeature.properties.biba_id;
+                    id_value.innerHTML = id;
+                    var temp = clickedFeature.properties.temperature;
+                    temp_value.innerHTML = temp;
+                    var xy = clickedFeature.geometry.coordinates;
+                    xy_value.innerHTML= xy;
+                    var pol = clickedFeature.properties.gas_2;
+                    pollution_value.innerHTML = pol;
+                    var co2 = clickedFeature.properties.gas_1;
+                    co2_value.innerHTML = co2;
+                    var noize = clickedFeature.properties.noise;
+                    noize_value.innerHTML = noize;
+                    
+                    tempArr = arrClear(tempArr);
+                    humArr = arrClear(humArr);
+                    clickedFeature.properties.t_list.forEach(function(point)    {
+                        let time = new Date(point.time.y, point.time.mo, point.time.d, point.time.h, point.time.mi, point.time.s, 0);
+                        tempArr.push([time, point.val]);
+                    });
+                    clickedFeature.properties.h_list.forEach(function(point)    {
+                        let time = new Date(point.time.y, point.time.mo, point.time.d, point.time.h, point.time.mi, point.time.s, 0);
+                        humArr.push([time, point.val]);
+                    });
+                    drawChart();
+                }
+            });      
+            display.addEventListener('pointerenter', function(evt){
+                setFeature(evt.target, selectedStyle);
+            });
+
+            // add event listener to pointerleave
+            display.addEventListener('pointerleave', function(evt){
+                if (clickedFeature != evt.target)
+                    setFeature(evt.target, baseStyle);
+            });
+            
+            display.addLayer(pointsLayer);
+            display.addLayer(deviceLayer);
+            
+            function updateFeatures()   {
+                var features = sProvider.all();
+                features.forEach(function(feature) {
+                    var temp = feature.properties.t_list(0).val;
+                    var style = {
+                        zIndex:0, type:"Circle", radius:16, fill:"#" + (temp/20*255) + "0000", opacity: 0.8
+                    };
+                    pointsLayer.setStyleGroup(feature, style); 
+                });
+            }
+            //updateFeatures();
             
             var minX = 59.85115;
             var minY = 30.16413;
             var maxX = 60.02331;
             var maxY = 30.50722;
-            let freq = 10;
-            setInterval(1 / freq, request);     
-            
-        </script>
-        
-        <script src="https://www.google.com/jsapi"></script>
-        <script>  
+           
+            /*
             let arr = new Array;
             arr.push(['t', 'T']);
             for (var i = 0; i < 50; i++)    {
                 arr.push([i, Math.sin(i)]);   
-            }
+            }*/
             
-            var options = {
-                hAxis: {title: 'Время, мин', 
+            var tempOptions = {
+                hAxis: {title: 'Время, сек', 
                         titleTextStyle: {color: '#00F7FF'},
                         textStyle: {color: "009DA2"},  
                         gridlines: {color: "#009DA2"}},
                 vAxis: {title: 'Температура, °С',
                         titleTextStyle: {color: '00F7FF'},
                         textStyle: {color: "009DA2"},    
-                        gridlines: {color: '#009DA2'}},
+                        gridlines: {color: '#009DA2'}
+                       },
+                backgroundColor: '#343a40',
+                series: [{color: '#00F7FF'}],
+                curveType: 'function'
+            };
+            
+            var humOptions = {
+                hAxis: {title: 'Время, сек', 
+                        titleTextStyle: {color: '#00F7FF'},
+                        textStyle: {color: "009DA2"},  
+                        gridlines: {color: "#009DA2"}},
+                vAxis: {title: 'Влжаность, %',
+                        titleTextStyle: {color: '00F7FF'},
+                        textStyle: {color: "009DA2"},    
+                        gridlines: {color: '#009DA2'}
+                       },
                 backgroundColor: '#343a40',
                 series: [{color: '#00F7FF'}],
                 curveType: 'function'
@@ -199,20 +315,14 @@
             
             google.load("visualization", "1", {packages:["corechart"]});
             google.setOnLoadCallback(drawChart);                            
-            
-            
-            function drawChart() {                                 
+                        
+            function drawChart() {                                  
                 let temp_chart = new google.visualization.LineChart(document.getElementById('temp_chart'));
-                let pol_chart = new google.visualization.LineChart(document.getElementById('pol_chart'));
-                let data = google.visualization.arrayToDataTable(arr);
-                temp_chart.draw(data, options);
-                pol_chart.draw(data, options);
-            }
-            
-            function addPoint(value) {
-                arr.pop();
-                arr.push(value);
-                drawChart();
+                let hum_chart = new google.visualization.LineChart(document.getElementById('hum_chart'));   
+                var tempData = google.visualization.arrayToDataTable(tempArr);
+                var humData = google.visualization.arrayToDataTable(humArr);
+                temp_chart.draw(tempData, tempOptions);
+                hum_chart.draw(humData, humOptions);
             }
           </script>
     </body>
