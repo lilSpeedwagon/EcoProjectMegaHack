@@ -68,6 +68,18 @@ class Biba():
             'x':self.x
         }
 
+def current_time():
+    dt = datetime.now()
+    t = {
+        's':dt.second,
+        'mi':dt.minute,
+        'h':dt.hour,
+        'd':dt.day,
+        'mo':dt.month,
+        'y':dt.year
+    }
+    return t
+
 async def biba_sim(biba_id,space_id,session,access_data):
     
     work_time = 10000000
@@ -94,8 +106,8 @@ async def biba_sim(biba_id,space_id,session,access_data):
                 "biba_id":biba_id,
                 "temperature":biba.t,
                 "humidity":biba.h,
-                "t_list":[{"val":biba.t,"time":datetime.today().strftime("%Y-%m-%d-%H.%M.%S")}],
-                "h_list":[{"val":biba.h,"time":datetime.today().strftime("%Y-%m-%d-%H.%M.%S")}],
+                "t_list":[{"val":biba.t,"time":current_time()}],
+                "h_list":[{"val":biba.h,"time":current_time()}],
                 "noise":0,
             }
         }
@@ -121,17 +133,17 @@ async def biba_sim(biba_id,space_id,session,access_data):
                 content = json.loads(await response.text())
                 try:
                     h_list = content['properties']['h_list']
-                    h_list.append({"val":biba.h, "time":datetime.today().strftime("%Y-%m-%d-%H.%M.%S")})
+                    h_list.append({"val":biba.h, "time":current_time()})
                     if len(h_list) > 100:
                         h_list.pop(0)
                     t_list = content['properties']['t_list']
-                    t_list.append({"val":biba.t, "time":datetime.today().strftime("%Y-%m-%d-%H.%M.%S")})
+                    t_list.append({"val":biba.t, "time":current_time()})
                     if len(t_list) > 100:
                         t_list.pop(0)
                 except Exception as e:
                     print(e)
-                    h_list = [{"val":biba.h,"time":datetime.today().strftime("%Y-%m-%d-%H.%M.%S")}]
-                    t_list = [{"val":biba.t,"time":datetime.today().strftime("%Y-%m-%d-%H.%M.%S")}]    
+                    h_list = [{"val":biba.h,"time":current_time()}]
+                    t_list = [{"val":biba.t,"time":current_time()}]    
                 features_json = {
                     "type": "Feature",
                     "geometry":
@@ -154,9 +166,7 @@ async def biba_sim(biba_id,space_id,session,access_data):
                     }
                 }
                 async with session.put('https://xyz.api.here.com/hub/spaces/{space_id}/features/{feature_id}'.format(space_id = space_id, feature_id = id_), json = features_json, params={'access_token':access_data['token']}) as response:
-                    await response.text()
                     await asyncio.sleep(1)
-
 
 async def simulate(biba_nums, space_id, access_data):
     async with aiohttp.ClientSession() as session:
