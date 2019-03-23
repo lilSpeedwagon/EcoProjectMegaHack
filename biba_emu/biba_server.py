@@ -77,8 +77,7 @@ def current_time():
     }
     return t
 
-if __name__ == '__main__':
-
+def main():
     with open('access_data_server.json') as f:
         access_data = json.load(fp = f)
 
@@ -163,11 +162,16 @@ if __name__ == '__main__':
                 "temperature":dat['t'],
                 "t_list":t_list,
                 "h_list":h_list,
+                "gas_1":dat['g1'],
+                "gas_2":dat['g2'],
                 "humidity":dat['h'],
-                "noise":0,
+                "noise":dat['n'],
             }
         }
         response = requests.put('https://xyz.api.here.com/hub/spaces/{space_id}/features/{feature_id}'.format(space_id = space_id, feature_id = feature_id), json = features_json, params={'access_token':access_data['token']})     
         return ('OK')
 
     bottle.run(host='192.168.184.1', port=8056)
+
+if __name__ == '__main__':
+    main()
