@@ -100,7 +100,7 @@ def current_time():
 async def biba_sim(biba_id,space_id,session,access_data,feature_table):
     
     work_time = 10000000
-    sleep_time = 1
+    sleep_time = 5
 
     start_time = time.time()
     biba = Biba(biba_id)
@@ -151,11 +151,11 @@ async def biba_sim(biba_id,space_id,session,access_data,feature_table):
             try:
                 h_list = content['properties']['h_list']
                 h_list.append({"val":biba.h, "time":current_time()})
-                if len(h_list) > 100:
+                if len(h_list) > 30:
                     h_list.pop(0)
                 t_list = content['properties']['t_list']
                 t_list.append({"val":biba.t, "time":current_time()})
-                if len(t_list) > 100:
+                if len(t_list) > 30:
                     t_list.pop(0)
             except Exception as e:
                 print(e)
@@ -213,6 +213,7 @@ if __name__ == '__main__':
         space_id = access_data['space_id']
     except:    
         response = requests.post('https://xyz.api.here.com/hub/spaces', params={'access_token':access_data['token']}, json = new_space)
+        pprint(response.content)
         space_id = json.loads(response.content)['id']
         with open('access_data.json','w') as f:
             new_json = {

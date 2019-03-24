@@ -99,6 +99,8 @@ def main():
                             "temperature":None,
                             "t_list":[],
                             "h_list":[],
+                            "gas_1":0,
+                            "gas_2":0,
                             "humidity":None,
                             "noise":0,
                         }
@@ -114,7 +116,7 @@ def main():
         response = requests.put('https://xyz.api.here.com/hub/spaces/{space_id}/features'.format(space_id = space_id), json = features_json, params={'access_token':access_data['token']})
         pprint(json.loads(response.content))
         feature_id = json.loads(response.content)['features'][0]['id']
-
+        
         with open('access_data_server.json','w') as f:
             access_data = {
                 'token':access_data['token'],
